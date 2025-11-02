@@ -41,13 +41,17 @@ export async function fetchSoilData(lat: number, lon: number, address: string): 
     // Try SoilWeb API first
     const soilWebUrl = `https://casoilresource.lawr.ucdavis.edu/soil_web/reflector_api/soils.php?what=mapunit&lon=${lon}&lat=${lat}`;
 
+    console.log('Fetching soil data from:', soilWebUrl);
     const response = await fetch(soilWebUrl);
 
+    console.log('SoilWeb response status:', response.status, response.statusText);
+
     if (!response.ok) {
-      throw new Error('SoilWeb API request failed');
+      throw new Error(`SoilWeb API request failed: ${response.status} ${response.statusText}`);
     }
 
     const data: SoilWebResponse = await response.json();
+    console.log('SoilWeb response data:', data);
 
     // If we got a mukey, fetch detailed soil properties
     if (data.mukey || (data.mapunits && data.mapunits.length > 0)) {
@@ -73,10 +77,22 @@ export async function fetchSoilData(lat: number, lon: number, address: string): 
     };
   } catch (error) {
     console.error('Soil data fetch error:', error);
+
+    // Provide more helpful error message
+    let errorMessage = 'Failed to fetch soil data';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+
+      // Check for common errors
+      if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
+        errorMessage = 'Unable to connect to soil data service. This may be due to browser security restrictions. Try accessing the deployed site instead of localhost.';
+      }
+    }
+
     return {
       location: { lat, lon, address },
       soilProperties: {},
-      error: error instanceof Error ? error.message : 'Failed to fetch soil data'
+      error: errorMessage
     };
   }
 }
@@ -103,6 +119,7 @@ async function fetchDetailedSoilProperties(mukey: string) {
       ORDER BY c.comppct_r DESC, ch.hzdept_r ASC
     `;
 
+    console.log('Querying NRCS SDA for mukey:', mukey);
     const response = await fetch('https://SDMDataAccess.sc.egov.usda.gov/Tabular/post.rest', {
       method: 'POST',
       headers: {
@@ -114,11 +131,14 @@ async function fetchDetailedSoilProperties(mukey: string) {
       })
     });
 
+    console.log('NRCS SDA response status:', response.status);
+
     if (!response.ok) {
-      throw new Error('NRCS SDA query failed');
+      throw new Error(`NRCS SDA query failed: ${response.status}`);
     }
 
     const result = await response.json();
+    console.log('NRCS SDA response:', result);
 
     if (result.Table && result.Table.length > 0) {
       const data = result.Table;

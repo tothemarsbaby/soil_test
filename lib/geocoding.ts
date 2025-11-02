@@ -9,20 +9,27 @@ export interface GeocodingResult {
 
 export async function geocodeAddress(address: string): Promise<GeocodingResult | null> {
   try {
+    // Add US bias for better results
+    const searchParams = new URLSearchParams({
+      format: 'json',
+      q: address,
+      limit: '1',
+      countrycodes: 'us',
+      addressdetails: '1'
+    });
+
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
-      {
-        headers: {
-          'User-Agent': 'SoilTestApp/1.0'
-        }
-      }
+      `https://nominatim.openstreetmap.org/search?${searchParams.toString()}`
+      // Note: Don't set custom headers like User-Agent - browsers block this
     );
 
     if (!response.ok) {
-      throw new Error('Geocoding failed');
+      console.error('Geocoding response not OK:', response.status, response.statusText);
+      throw new Error(`Geocoding failed: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
+    console.log('Geocoding response:', data);
 
     if (data && data.length > 0) {
       return {
